@@ -1,16 +1,14 @@
 package com.example.sainikhil.vasavinews.postdata;
 
-import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.Fragment;
+import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -22,13 +20,18 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.example.sainikhil.vasavinews.HomePage;
-import com.example.sainikhil.vasavinews.PostNewsActivity;
 import com.example.sainikhil.vasavinews.R;
 import com.google.android.flexbox.FlexboxLayout;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import fisk.chipcloud.ChipCloud;
 import fisk.chipcloud.ChipCloudConfig;
@@ -42,6 +45,8 @@ public class PostNewsFragment extends Fragment {
     private static final String TAG = "PostNewsFragment";
     private static final int GALLERY_REQUEST = 1;
     private static final int CAMERA_REQUEST = 2;
+    static int position=0;
+    Map<String, String> data1=null,dataMap_position=null,dataMap=null;
     private VerticalStepperItemView mSteppers[] = new VerticalStepperItemView[4];
     public boolean[] selected_tags= new boolean[40];//contains the selected tags in order of the array specified
     boolean flag=false;
@@ -49,8 +54,10 @@ public class PostNewsFragment extends Fragment {
     ImageView imageview;
     TextView news_title_preview,news_details_preview;
     EditText headline,details;
+    ByteArrayOutputStream bytearrayoutputstream;
     Bitmap bitmap;
     Button imagefromstock;
+    DatabaseReference databaseReference;
     ImageButton imagefromgallery,imagefromcamera;
     public PostNewsFragment() {
         // Required empty public constructor
@@ -65,7 +72,6 @@ public class PostNewsFragment extends Fragment {
         imagefromgallery=(ImageButton)view.findViewById(R.id.button_from_gallery);
         imagefromcamera=(ImageButton)view.findViewById(R.id.button_from_camera);
         imagefromstock=(Button)view.findViewById(R.id.button_from_stock);
-
         mSteppers[0] = view.findViewById(R.id.info_part);
         mSteppers[1] = view.findViewById(R.id.image_part);
         mSteppers[2] = view.findViewById(R.id.tags_part);
@@ -126,19 +132,54 @@ public class PostNewsFragment extends Fragment {
             @Override
             public void onClick(View view) {
                 Snackbar.make(view, "Finish!", Snackbar.LENGTH_LONG).show();
-                Intent intent=new Intent();
-                intent.putExtra("title",title);
-                intent.putExtra("description",description);
+                databaseReference = FirebaseDatabase.getInstance().getReference().child("position");
+                databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
 
-                imageview.buildDrawingCache();
-                bitmap= imageview.getDrawingCache();
-                ByteArrayOutputStream bytearrayoutputstream=new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.PNG,100,bytearrayoutputstream);
-                intent.putExtra("imagebitmap",bytearrayoutputstream.toByteArray());
-                intent.putExtra("post_related_tags",selected_tags);
-                getActivity().setResult(RESULT_OK, intent);
-                getActivity().finish();
+                    @Override
+                        public void onDataChange(DataSnapshot dataSnapshot) {
+                            data1 = (Map<String, String>) dataSnapshot.getValue();
+                            for (Map.Entry<String, String> e1 : data1.entrySet()) {
+                                //if (e1.getKey().equals("index_value")) ;
+                                position = Integer.valueOf(e1.getValue());
+                                dataMap_position = new HashMap<String, String>();
+                                dataMap_position.put("index_value",String.valueOf(position+1));
+                                databaseReference.setValue(dataMap_position);
+                                imageview.buildDrawingCache();
+                                bitmap= imageview.getDrawingCache();
+                                Toast.makeText(getContext(),"hello"+String.valueOf(position),Toast.LENGTH_SHORT).show();
+                                bytearrayoutputstream=new ByteArrayOutputStream();
+                                bitmap.compress(Bitmap.CompressFormat.PNG,100,bytearrayoutputstream);
+                                byte[] imageBytes =bytearrayoutputstream.toByteArray();
+                                String imageString = Base64.encodeToString(imageBytes, Base64.DEFAULT);
+                                databaseReference = FirebaseDatabase.getInstance().getReference().child("Post"+position);
+                                dataMap = new HashMap<String, String>();
+                                dataMap.put("Post_Description", description);
+                                dataMap.put("Post_Title", title);
+                                dataMap.put("Imagebitmap", imageString);
+                                databaseReference.setValue(dataMap);
+                                Intent intent=new Intent();
+                                getActivity().setResult(RESULT_OK, intent);
+                                getActivity().finish();
+                            }
+                        }
+                    @Override
+                    public void onCancelled(DatabaseError databaseError) {
 
+                    }
+                });
+
+
+//                databaseReference.addValueEventListener(new ValueEventListener() {
+//                    @Override
+//                    public void onDataChange(DataSnapshot dataSnapshot) {
+//
+//                    }
+//
+//                    @Override
+//                    public void onCancelled(DatabaseError databaseError) {
+//
+//                    }
+//                });
             }
         });
 
